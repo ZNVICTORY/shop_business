@@ -57,6 +57,7 @@ class ShopOrder {
     required this.items,
     this.address = '',
     this.buyerEmail,
+    this.merchantNote = '',
   });
 
   final String id;
@@ -69,6 +70,9 @@ class ShopOrder {
   OrderStatus status;
   final List<OrderItem> items;
   String address;
+
+  /// 商家备注（本地演示；接后端后同步接口）。
+  String merchantNote;
 
   double get total => items.fold(0, (a, b) => a + b.lineTotal);
 }

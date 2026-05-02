@@ -67,9 +67,35 @@ class MerchantStore extends ChangeNotifier {
 
   String branchName(String branchId) => _branch[branchId]?.name ?? branchId;
 
+  /// 库存预警阈值（≤ 此数量且在架视为预警）。
+  static const int lowStockThreshold = 10;
+
+  /// 当前门店：在售且库存偏低的商品（用于工作台预警）。
+  List<Product> get lowStockProducts {
+    final list = products
+        .where((p) => p.onShelf && p.stock > 0 && p.stock <= lowStockThreshold)
+        .toList();
+    list.sort((a, b) => a.stock.compareTo(b.stock));
+    return list;
+  }
+
   List<Product> get products => List.unmodifiable(_branch[_currentBranchId]!.products);
 
   List<ShopOrder> get orders => List.unmodifiable(_branch[_currentBranchId]!.orders);
+
+  /// 指定门店订单（用于「仅卖场」视图）。
+  List<ShopOrder> ordersOnBranch(String branchId) =>
+      List.unmodifiable(_branch[branchId]?.orders ?? []);
+
+  /// 全部门店订单合并（按时间倒序）。
+  List<ShopOrder> get allOrdersAllBranches {
+    final out = <ShopOrder>[];
+    for (final b in _branch.values) {
+      out.addAll(b.orders);
+    }
+    out.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return out;
+  }
 
   /// 用户订单列表数据源（卖场门店）。
   List<ShopOrder> get catalogOrders => List.unmodifiable(_branch[catalogBranchId]!.orders);
@@ -237,6 +263,11 @@ class MerchantStore extends ChangeNotifier {
       o.status = OrderStatus.completed;
       notifyListeners();
     }
+  }
+
+  void updateOrderMerchantNote(ShopOrder order, String note) {
+    order.merchantNote = note;
+    notifyListeners();
   }
 
   void _seed() {

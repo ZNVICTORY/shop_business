@@ -8,17 +8,53 @@ import '../theme/app_theme.dart';
 import '../widgets/currency_text.dart';
 import 'scan_inbound_screen.dart';
 
-class ProductsScreen extends StatelessWidget {
+class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
+
+  @override
+  State<ProductsScreen> createState() => _ProductsScreenState();
+}
+
+class _ProductsScreenState extends State<ProductsScreen> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Product> _filtered(MerchantStore store) {
+    final q = _searchController.text.trim().toLowerCase();
+    if (q.isEmpty) return store.products.toList();
+    return store.products
+        .where(
+          (p) =>
+              p.name.toLowerCase().contains(q) ||
+              p.sku.toLowerCase().contains(q) ||
+              p.id.toLowerCase().contains(q),
+        )
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     final store = context.watch<MerchantStore>();
     final theme = Theme.of(context);
+    final list = _filtered(store);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('商品管理'),
+        title: TextField(
+          controller: _searchController,
+          decoration: const InputDecoration(
+            hintText: '搜索名称、SKU、编码',
+            border: InputBorder.none,
+            isDense: true,
+          ),
+          style: theme.textTheme.titleMedium,
+          onChanged: (_) => setState(() {}),
+        ),
         actions: [
           IconButton(
             tooltip: '扫码入库',
@@ -47,75 +83,86 @@ class ProductsScreen extends StatelessWidget {
                 ),
               ),
             )
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
-              itemCount: store.products.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) {
-                final p = store.products[i];
-                return Card(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () => _openEditor(context, p),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          _EmojiAvatar(emoji: p.imageEmoji),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        p.name,
-                                        style: theme.textTheme.titleSmall,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    _ShelfChip(onShelf: p.onShelf),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'SKU ${p.sku} · 库存 ${p.stock}',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.onSurfaceMuted,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                CurrencyText(
-                                  p.price,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: p.onShelf ? '下架' : '上架',
-                            onPressed: () => store.toggleShelf(p),
-                            icon: Icon(
-                              p.onShelf
-                                  ? Icons.toggle_on
-                                  : Icons.toggle_off_outlined,
-                              color: p.onShelf
-                                  ? theme.colorScheme.primary
-                                  : AppTheme.onSurfaceMuted,
-                            ),
-                          ),
-                        ],
-                      ),
+          : list.isEmpty
+              ? Center(
+                  child: Text(
+                    '没有匹配「${_searchController.text}」的商品',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: AppTheme.onSurfaceMuted,
                     ),
                   ),
-                );
-              },
-            ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+                  itemCount: list.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, i) {
+                    final p = list[i];
+                    return Card(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => _openEditor(context, p),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              _EmojiAvatar(emoji: p.imageEmoji),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            p.name,
+                                            style: theme.textTheme.titleSmall,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        _ShelfChip(onShelf: p.onShelf),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'SKU ${p.sku} · 库存 ${p.stock}',
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        color: AppTheme.onSurfaceMuted,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    CurrencyText(
+                                      p.price,
+                                      style:
+                                          theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: p.onShelf ? '下架' : '上架',
+                                onPressed: () => store.toggleShelf(p),
+                                icon: Icon(
+                                  p.onShelf
+                                      ? Icons.toggle_on
+                                      : Icons.toggle_off_outlined,
+                                  color: p.onShelf
+                                      ? theme.colorScheme.primary
+                                      : AppTheme.onSurfaceMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 
@@ -220,7 +267,10 @@ class ProductsScreen extends StatelessWidget {
                     final sku = skuCtrl.text.trim();
                     final price = double.tryParse(priceCtrl.text.trim());
                     final stock = int.tryParse(stockCtrl.text.trim());
-                    if (name.isEmpty || sku.isEmpty || price == null || stock == null) {
+                    if (name.isEmpty ||
+                        sku.isEmpty ||
+                        price == null ||
+                        stock == null) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         const SnackBar(content: Text('请填写完整信息')),
                       );

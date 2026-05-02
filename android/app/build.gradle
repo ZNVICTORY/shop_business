@@ -29,7 +29,8 @@ android {
     namespace "com.example.flutter_shop"
     // mobile_scanner 等插件要求较高 compileSdk；参见 flutter.dev/to/review-gradle-config
     compileSdkVersion 36
-    ndkVersion flutter.ndkVersion
+    // 与 mobile_scanner、printing 等插件要求的 NDK 对齐（与本机已安装的 NDK 目录一致）
+    ndkVersion "26.1.10909125"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

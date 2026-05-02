@@ -3,10 +3,23 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/order.dart';
+import '../services/order_export.dart';
 import '../state/merchant_store.dart';
-import '../services/shipping_label_pdf.dart';
 import '../theme/app_theme.dart';
 import '../widgets/currency_text.dart';
+import '../widgets/merchant_order_actions.dart';
+import 'merchant_order_detail_screen.dart';
+
+enum _OrderScope {
+  /// 当前选中门店
+  current,
+
+  /// 仅卖场（用户下单所在门店）
+  catalogOnly,
+
+  /// 全部门店合并
+  allBranches,
+}
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -18,6 +31,8 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final _searchController = TextEditingController();
+  _OrderScope _scope = _OrderScope.current;
 
   static const _tabs = <OrderStatus?>[
     null,
@@ -41,7 +56,58 @@ class _OrdersScreenState extends State<OrdersScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  List<ShopOrder> _baseOrders(MerchantStore store) {
+    switch (_scope) {
+      case _OrderScope.current:
+        return store.orders;
+      case _OrderScope.catalogOnly:
+        return store.ordersOnBranch(MerchantStore.catalogBranchId);
+      case _OrderScope.allBranches:
+        return store.allOrdersAllBranches;
+    }
+  }
+
+  static bool _orderMatches(ShopOrder o, String q) {
+    if (q.isEmpty) return true;
+    final s = q.trim().toLowerCase();
+    if (o.id.toLowerCase().contains(s)) return true;
+    if (o.buyer.toLowerCase().contains(s)) return true;
+    if (o.address.toLowerCase().contains(s)) return true;
+    if (o.merchantNote.toLowerCase().contains(s)) return true;
+    for (final it in o.items) {
+      if (it.productName.toLowerCase().contains(s)) return true;
+    }
+    return false;
+  }
+
+  Future<void> _exportVisible(BuildContext context) async {
+    final store = context.read<MerchantStore>();
+    final filter = _tabs[_tabController.index];
+    final base = _baseOrders(store);
+    final list = base.where((o) {
+      if (filter != null && o.status != filter) return false;
+      return _orderMatches(o, _searchController.text);
+    }).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    if (list.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前没有可导出的订单')),
+      );
+      return;
+    }
+    final csv = ordersToCsv(list, store.branchName);
+    await shareOrdersCsv(csv);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('已生成 CSV（${list.length} 条），请在分享面板保存或用 Excel 打开')),
+      );
+    }
   }
 
   @override
@@ -49,15 +115,90 @@ class _OrdersScreenState extends State<OrdersScreen>
     final store = context.watch<MerchantStore>();
     final theme = Theme.of(context);
     final dateFmt = DateFormat('MM-dd HH:mm');
+    final q = _searchController.text;
+    final base = _baseOrders(store);
+    final showChip = _scope == _OrderScope.allBranches ||
+        (_scope == _OrderScope.catalogOnly &&
+            store.currentBranchId != MerchantStore.catalogBranchId);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('订单管理'),
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          tabs: [for (final t in _tabs) Tab(text: _tabLabel(t))],
+        actions: [
+          IconButton(
+            tooltip: '导出当前列表为 CSV（Excel）',
+            icon: const Icon(Icons.table_chart_outlined),
+            onPressed: () => _exportVisible(context),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(152),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: '搜索订单、买家、地址、备注、商品',
+                    prefixIcon: const Icon(Icons.search, size: 22),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: q.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SegmentedButton<_OrderScope>(
+                      segments: const [
+                        ButtonSegment(
+                          value: _OrderScope.current,
+                          label: Text('本店'),
+                          tooltip: '当前门店订单',
+                        ),
+                        ButtonSegment(
+                          value: _OrderScope.catalogOnly,
+                          label: Text('卖场'),
+                          tooltip: '用户下单门店（卖场）',
+                        ),
+                        ButtonSegment(
+                          value: _OrderScope.allBranches,
+                          label: Text('全部门店'),
+                          tooltip: '合并所有门店',
+                        ),
+                      ],
+                      selected: {_scope},
+                      onSelectionChanged: (s) {
+                        setState(() => _scope = s.first);
+                      },
+                      showSelectedIcon: false,
+                    ),
+                  ),
+                ),
+              ),
+              TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                tabs: [for (final t in _tabs) Tab(text: _tabLabel(t))],
+              ),
+            ],
+          ),
         ),
       ),
       body: TabBarView(
@@ -65,13 +206,15 @@ class _OrdersScreenState extends State<OrdersScreen>
         children: [
           for (final filter in _tabs)
             _OrderListView(
-              orders: store.orders.where((o) {
-                if (filter == null) return true;
-                return o.status == filter;
+              orders: base.where((o) {
+                if (filter != null && o.status != filter) return false;
+                return _orderMatches(o, q);
               }).toList()
                 ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
               dateFmt: dateFmt,
               theme: theme,
+              showBranchChip: showChip,
+              branchName: store.branchName,
             ),
         ],
       ),
@@ -84,11 +227,15 @@ class _OrderListView extends StatelessWidget {
     required this.orders,
     required this.dateFmt,
     required this.theme,
+    this.showBranchChip = false,
+    required this.branchName,
   });
 
   final List<ShopOrder> orders;
   final DateFormat dateFmt;
   final ThemeData theme;
+  final bool showBranchChip;
+  final String Function(String branchId) branchName;
 
   @override
   Widget build(BuildContext context) {
@@ -109,77 +256,111 @@ class _OrderListView extends StatelessWidget {
       itemBuilder: (context, i) {
         final o = orders[i];
         return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        o.id,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                    _StatusBadge(status: o.status),
-                  ],
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => MerchantOrderDetailScreen(order: o),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${o.buyer} · ${dateFmt.format(o.createdAt)}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppTheme.onSurfaceMuted,
-                  ),
-                ),
-                if (o.address.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    o.address,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-                const Divider(height: 20),
-                ...o.items.map(
-                  (line) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(line.productName)),
-                        Text('×${line.quantity}'),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 88,
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: CurrencyText(line.lineTotal),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          o.id,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontFamily: 'monospace',
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Spacer(),
-                    Text(
-                      '合计 ',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    CurrencyText(
-                      o.total,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
                       ),
+                      if (o.merchantNote.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Icon(
+                            Icons.sticky_note_2_outlined,
+                            size: 18,
+                            color: theme.colorScheme.tertiary,
+                          ),
+                        ),
+                      _StatusBadge(status: o.status),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 20,
+                        color: AppTheme.onSurfaceMuted,
+                      ),
+                    ],
+                  ),
+                  if (showBranchChip) ...[
+                    const SizedBox(height: 6),
+                    Chip(
+                      visualDensity: VisualDensity.compact,
+                      label: Text(branchName(o.branchId)),
+                      padding: EdgeInsets.zero,
+                      labelStyle: theme.textTheme.labelSmall,
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                _OrderActions(order: o),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    '${o.buyer} · ${dateFmt.format(o.createdAt)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppTheme.onSurfaceMuted,
+                    ),
+                  ),
+                  if (o.address.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      o.address,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                  const Divider(height: 20),
+                  ...o.items.map(
+                    (line) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text(line.productName)),
+                          Text('×${line.quantity}'),
+                          const SizedBox(width: 12),
+                          SizedBox(
+                            width: 88,
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: CurrencyText(line.lineTotal),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Spacer(),
+                      Text(
+                        '合计 ',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      CurrencyText(
+                        o.total,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  MerchantOrderActionsBar(order: o),
+                ],
+              ),
             ),
           ),
         );
@@ -208,63 +389,6 @@ class _StatusBadge extends StatelessWidget {
           color: theme.colorScheme.onSecondaryContainer,
         ),
       ),
-    );
-  }
-}
-
-class _OrderActions extends StatelessWidget {
-  const _OrderActions({required this.order});
-
-  final ShopOrder order;
-
-  @override
-  Widget build(BuildContext context) {
-    final store = context.read<MerchantStore>();
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: WrapAlignment.end,
-      children: [
-        if (order.status == OrderStatus.toShip)
-          FilledButton.icon(
-            onPressed: () => store.shipOrder(order),
-            icon: const Icon(Icons.local_shipping_outlined, size: 18),
-            label: const Text('发货'),
-          ),
-        if (order.status == OrderStatus.shipped)
-          OutlinedButton.icon(
-            onPressed: () => store.completeOrder(order),
-            icon: const Icon(Icons.check_circle_outline, size: 18),
-            label: const Text('确认完成'),
-          ),
-        if (order.status == OrderStatus.pendingPayment)
-          Text(
-            '等待买家付款',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.onSurfaceMuted,
-                ),
-          ),
-        if (order.status == OrderStatus.toShip ||
-            order.status == OrderStatus.shipped)
-          OutlinedButton.icon(
-            onPressed: () async {
-              try {
-                await printElectronicShippingLabel(
-                  order: order,
-                  branchName: store.branchName(order.branchId),
-                );
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('打印失败：$e')),
-                  );
-                }
-              }
-            },
-            icon: const Icon(Icons.print_outlined, size: 18),
-            label: const Text('电子面单'),
-          ),
-      ],
     );
   }
 }

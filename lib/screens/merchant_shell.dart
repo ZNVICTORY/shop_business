@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../merchant_tab_scope.dart';
 import '../theme/layout_breakpoints.dart';
 import 'analytics_screen.dart';
 import 'dashboard_screen.dart';
@@ -32,15 +33,22 @@ class _MerchantShellState extends State<MerchantShell> {
         final wide = constraints.maxWidth >= kDesktopNavBreakpoint;
         final extendedRail = constraints.maxWidth >= 1100;
 
-        final stack = IndexedStack(
-          index: _index,
-          children: const [
-            DashboardScreen(),
-            ProductsScreen(),
-            OrdersScreen(),
-            AnalyticsScreen(),
-            ProfileScreen(),
-          ],
+        final stack = MerchantTabScope(
+          goToTab: (i) {
+            if (i >= 0 && i < _titles.length) {
+              setState(() => _index = i);
+            }
+          },
+          child: IndexedStack(
+            index: _index,
+            children: const [
+              DashboardScreen(),
+              ProductsScreen(),
+              OrdersScreen(),
+              AnalyticsScreen(),
+              ProfileScreen(),
+            ],
+          ),
         );
 
         if (!wide) {

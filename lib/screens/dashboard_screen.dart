@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../merchant_tab_scope.dart';
 import '../state/merchant_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/currency_text.dart';
@@ -119,7 +120,59 @@ class DashboardScreen extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 24),
+          if (store.lowStockProducts.isNotEmpty) ...[
+            Text('库存预警', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              '以下 SKU 库存 ≤ ${MerchantStore.lowStockThreshold}，建议补货或入库',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppTheme.onSurfaceMuted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Card(
+              child: Column(
+                children: [
+                  for (var i = 0;
+                      i < store.lowStockProducts.length && i < 5;
+                      i++)
+                    ListTile(
+                      dense: true,
+                      leading: Text(
+                        store.lowStockProducts[i].imageEmoji,
+                        style: const TextStyle(fontSize: 22),
+                      ),
+                      title: Text(store.lowStockProducts[i].name),
+                      subtitle: Text('SKU ${store.lowStockProducts[i].sku}'),
+                      trailing: Text(
+                        '余 ${store.lowStockProducts[i].stock}',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  if (store.lowStockProducts.length > 5)
+                    ListTile(
+                      dense: true,
+                      title: Text(
+                        '还有 ${store.lowStockProducts.length - 5} 个…',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppTheme.onSurfaceMuted,
+                        ),
+                      ),
+                    ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.inventory_2_outlined),
+                    title: const Text('前往商品管理'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => MerchantTabScope.goTo(context, 1),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
           Text('快捷入口', style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
           Card(
