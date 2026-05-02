@@ -13,7 +13,7 @@ Future<void> printElectronicShippingLabel({
   final font = await PdfGoogleFonts.notoSansSCRegular();
   final dateFmt = DateFormat('yyyy-MM-dd HH:mm');
   final mockWaybill =
-      'SF${order.id.hashCode.remainder(100000000).abs().toString().padLeft(8, '0')}';
+      'SF${(order.id.hashCode % 100000000).abs().toString().padLeft(8, '0')}';
 
   final doc = pw.Document(
     theme: pw.ThemeData.withFont(base: font),

@@ -47,7 +47,8 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_title(window, "flutter_shop");
   }
 
-  gtk_window_set_default_size(window, 1280, 720);
+  // 默认窗口大小（与 Windows / macOS 一致）
+  gtk_window_set_default_size(window, 1280, 800);
   gtk_widget_show(GTK_WIDGET(window));
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();

@@ -19,6 +19,7 @@ class _ScanInboundScreenState extends State<ScanInboundScreen> {
   final _qtyCtrl = TextEditingController(text: '1');
   final _manualCtrl = TextEditingController();
   String? _lastCode;
+  DateTime? _lastAutoInboundAt;
 
   static bool get _canUseCamera =>
       !kIsWeb &&
@@ -66,7 +67,7 @@ class _ScanInboundScreenState extends State<ScanInboundScreen> {
                       final v = b.rawValue;
                       if (v != null && v.isNotEmpty) {
                         setState(() => _lastCode = v);
-                        _confirmInbound(context, v);
+                        _confirmInbound(context, v, fromCamera: true);
                         break;
                       }
                     }
@@ -135,8 +136,17 @@ class _ScanInboundScreenState extends State<ScanInboundScreen> {
     BuildContext context,
     String code, {
     int? qtyOverride,
+    bool fromCamera = false,
   }) {
     if (code.isEmpty) return;
+    if (fromCamera) {
+      final now = DateTime.now();
+      if (_lastAutoInboundAt != null &&
+          now.difference(_lastAutoInboundAt!) < const Duration(milliseconds: 1200)) {
+        return;
+      }
+      _lastAutoInboundAt = now;
+    }
     final store = context.read<MerchantStore>();
     final q = qtyOverride ?? int.tryParse(_qtyCtrl.text.trim()) ?? 0;
     final err = store.inboundByScanCode(code, q);

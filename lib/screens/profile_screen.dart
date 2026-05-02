@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../state/auth_store.dart';
 import '../state/merchant_store.dart';
 import '../theme/app_theme.dart';
 
@@ -10,6 +11,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = context.watch<MerchantStore>();
+    final auth = context.watch<AuthStore>();
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -17,6 +19,33 @@ class ProfileScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
+          if (auth.isLoggedIn)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.account_circle_outlined),
+                title: Text(auth.displayName ?? '商家'),
+                subtitle: Text(auth.email ?? ''),
+              ),
+            ),
+          if (auth.isLoggedIn) const SizedBox(height: 12),
+          Text('门店切换', style: theme.textTheme.titleSmall),
+          Card(
+            child: Column(
+              children: [
+                for (final b in store.branches)
+                  RadioListTile<String>(
+                    title: Text(b.name),
+                    subtitle: Text(b.city),
+                    value: b.id,
+                    groupValue: store.currentBranchId,
+                    onChanged: (v) {
+                      if (v != null) store.switchBranch(v);
+                    },
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           Card(
             child: ListTile(
               leading: CircleAvatar(
@@ -69,7 +98,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Text(
-            '当前为本地演示数据；登录、权限与接口可在接入后端时补齐。',
+            '登录态与用户「我的」共用；门店数据按分店隔离。接入后端后替换为账号权限与接口。',
             style: theme.textTheme.bodySmall?.copyWith(
               color: AppTheme.onSurfaceMuted,
             ),

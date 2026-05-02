@@ -164,6 +164,12 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
+              if (!auth.isLoggedIn) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请先登录后再进入商家后台')),
+                );
+                return;
+              }
               Navigator.of(context).push<void>(
                 MaterialPageRoute<void>(
                   builder: (_) => const MerchantShell(),

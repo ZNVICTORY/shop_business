@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/layout_breakpoints.dart';
 import 'analytics_screen.dart';
 import 'dashboard_screen.dart';
 import 'orders_screen.dart';
@@ -26,29 +27,65 @@ class _MerchantShellState extends State<MerchantShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _index,
-        children: const [
-          DashboardScreen(),
-          ProductsScreen(),
-          OrdersScreen(),
-          AnalyticsScreen(),
-          ProfileScreen(),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: [
-          for (var i = 0; i < _titles.length; i++)
-            NavigationDestination(
-              icon: Icon(_iconOutlined(i)),
-              selectedIcon: Icon(_iconFilled(i)),
-              label: _titles[i],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= kDesktopNavBreakpoint;
+        final extendedRail = constraints.maxWidth >= 1100;
+
+        final stack = IndexedStack(
+          index: _index,
+          children: const [
+            DashboardScreen(),
+            ProductsScreen(),
+            OrdersScreen(),
+            AnalyticsScreen(),
+            ProfileScreen(),
+          ],
+        );
+
+        if (!wide) {
+          return Scaffold(
+            body: stack,
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: _index,
+              onDestinationSelected: (i) => setState(() => _index = i),
+              destinations: [
+                for (var i = 0; i < _titles.length; i++)
+                  NavigationDestination(
+                    icon: Icon(_iconOutlined(i)),
+                    selectedIcon: Icon(_iconFilled(i)),
+                    label: _titles[i],
+                  ),
+              ],
             ),
-        ],
-      ),
+          );
+        }
+
+        return Scaffold(
+          body: Row(
+            children: [
+              NavigationRail(
+                extended: extendedRail,
+                selectedIndex: _index,
+                onDestinationSelected: (i) => setState(() => _index = i),
+                labelType: extendedRail
+                    ? NavigationRailLabelType.none
+                    : NavigationRailLabelType.all,
+                destinations: [
+                  for (var i = 0; i < _titles.length; i++)
+                    NavigationRailDestination(
+                      icon: Icon(_iconOutlined(i)),
+                      selectedIcon: Icon(_iconFilled(i)),
+                      label: Text(_titles[i]),
+                    ),
+                ],
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(child: stack),
+            ],
+          ),
+        );
+      },
     );
   }
 

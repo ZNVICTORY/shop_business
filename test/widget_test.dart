@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_shop/app.dart';
 import 'package:flutter_shop/state/auth_store.dart';
+import 'package:flutter_shop/state/merchant_store.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,7 +13,9 @@ void main() {
     await initializeDateFormatting('zh_CN');
     final auth = AuthStore();
     await auth.load();
-    await tester.pumpWidget(ShopApp(auth: auth));
+    final merchant = MerchantStore();
+    await merchant.hydrate();
+    await tester.pumpWidget(ShopApp(auth: auth, merchant: merchant));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
