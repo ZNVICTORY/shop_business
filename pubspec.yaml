@@ -1,0 +1,27 @@
+name: flutter_shop
+description: 电商演示 — 用户侧商城与商家后台共用本地数据源。
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.2
+  intl: ^0.20.2
+  shared_preferences: ^2.3.3
+  pdf: ^3.11.3
+  printing: ^5.14.3
+  mobile_scanner: ^6.0.11
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
